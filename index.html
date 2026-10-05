@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Schulferien aller 16 Bundesländer an- und abwählen und ferienfreie Zeiträume finden.">
+<title>Ferienfrei-Planer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: Werkzeugleiste oben (Auswahlmatrix Land × Ferienart), darunter Ergebnisliste und Jahreskalender mit KW-Spalte */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --fg:#17222b; --muted:#5d6b76; --line:#d9dfe3;
+  --free:#1f7a5c; --free-bg:#d6efe5; --hol:#c2571a; --hol-rgb:194,87,26;
+  --accent:#24537a; --focus:#24537a; --weekend:#eef1f3;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171c; --surface:#18212a; --fg:#e6ecf0; --muted:#93a2ad; --line:#2a3743;
+  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75;
+  --accent:#8bb8e0; --focus:#8bb8e0; --weekend:#1c2731; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11171c; --surface:#18212a; --fg:#e6ecf0; --muted:#93a2ad; --line:#2a3743;
+  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75;
+  --accent:#8bb8e0; --focus:#8bb8e0; --weekend:#1c2731; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:20px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:2rem;font-weight:700;letter-spacing:.01em}
+h2{font-size:1.25rem;font-weight:600}
+.lead{color:var(--muted);margin:4px 0 0;max-width:65ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;margin-bottom:12px}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:.85rem}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+/* Matrix */
+.matrix-scroll{overflow-x:auto}
+table.matrix{border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%;min-width:340px}
+.matrix th,.matrix td{padding:0;text-align:center;border-bottom:1px solid var(--line)}
+.matrix thead th{font-family:var(--f-display);font-weight:600;font-size:.85rem;padding:6px 2px;vertical-align:bottom}
+.matrix thead th button,.matrix tbody th button{background:none;border:0;padding:4px 6px;border-radius:6px;width:100%}
+.matrix thead th button:hover,.matrix tbody th button:hover{background:var(--weekend)}
+.matrix tbody th{text-align:left;font-weight:500;white-space:nowrap}
+.matrix tbody th button{text-align:left;display:flex;gap:8px;align-items:baseline}
+.code{font-family:var(--f-display);font-weight:700;width:2.2em;display:inline-block}
+.sname{color:var(--muted);font-size:.85rem}
+.cell{display:grid;place-items:center;padding:4px}
+.cell input{width:20px;height:20px;accent-color:var(--hol);margin:0;cursor:pointer}
+.short{display:none}
+@media (max-width:640px){.sname{display:none}.long{display:none}.short{display:inline}}
+/* Ergebnis */
+.grid2{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.controls label{display:flex;gap:6px;align-items:center;font-size:.9rem}
+input[type=number]{width:4.5em;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.periods{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px;max-height:640px;overflow-y:auto}
+.period{width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-left:4px solid var(--free);border-radius:8px;padding:8px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-variant-numeric:tabular-nums}
+.period:hover{background:var(--free-bg)}
+.period[aria-pressed="true"]{background:var(--free-bg);border-color:var(--free)}
+.period.past{opacity:.55}
+.p-dates{font-weight:600}
+.p-len{font-family:var(--f-display);font-weight:700;font-size:1.15rem;color:var(--free);text-align:right;grid-row:span 2;align-self:center}
+.p-meta{color:var(--muted);font-size:.82rem}
+.empty{color:var(--muted);font-size:.9rem;padding:8px 0}
+.summary{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem}
+.summary b{color:var(--fg)}
+/* Kalender */
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:16px 18px}
+.month h3{font-family:var(--f-display);font-weight:600;font-size:1rem;margin:0 0 4px}
+.mgrid{display:grid;grid-template-columns:1.6em repeat(7,1fr);gap:2px;font-variant-numeric:tabular-nums;font-size:.78rem}
+.mgrid .wd{color:var(--muted);text-align:center;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em}
+.mgrid .kw{color:var(--muted);font-size:.66rem;display:grid;place-items:center}
+.day{aspect-ratio:1;border:0;border-radius:4px;padding:0;display:grid;place-items:center;background:var(--weekend);color:var(--fg);font-size:.78rem;position:relative;max-width:100%}
+.day.free{background:var(--free-bg);color:var(--fg)}
+.day.we.free{background:color-mix(in srgb,var(--free-bg) 70%,var(--weekend))}
+.day.hol{color:var(--fg)}
+.day.hot{color:#fff}
+.day.sel{outline:2px solid var(--free);outline-offset:-1px}
+.day.today::after{content:"";position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
+.day.picked{outline:2px solid var(--accent);outline-offset:-1px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:.82rem;color:var(--muted)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.ramp{width:90px;height:10px;border-radius:3px;background:linear-gradient(90deg,rgba(var(--hol-rgb),.15),rgba(var(--hol-rgb),1));display:inline-block;vertical-align:middle;margin:0 4px}
+.detail{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:.9rem;min-height:2.5em}
+.detail ul{margin:6px 0 0;padding-left:1.1em;columns:2 220px}
+.tabs{display:flex;gap:4px}
+.tab{border:1px solid var(--line);background:transparent;border-radius:6px;padding:4px 14px;font-family:var(--f-display);font-weight:600}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.foot{color:var(--muted);font-size:.8rem;max-width:80ch}
+.status{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:.85rem;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.live{background:var(--free)}.dot.offline{background:var(--hol)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Ferienfrei-Planer</h1>
+    <p class="lead">Wähle Bundesländer und Ferienarten aus. Grün sind alle Tage, an denen in keinem der gewählten Länder Schulferien sind.</p>
+    <p class="status" id="status"><span class="dot"></span><span id="statusText">Lade Ferientermine …</span><button class="chip" id="reload" hidden>Neu laden</button></p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-sel">
+    <div class="panel-head">
+      <h2 id="h-sel">Welche Ferien sollen zählen?</h2>
+      <div class="chips" role="group" aria-label="Schnellauswahl">
+        <button class="chip" data-preset="all">Alle</button>
+        <button class="chip" data-preset="none">Keine</button>
+        <button class="chip" data-preset="main">Ohne Einzeltage</button>
+        <button class="chip" data-preset="summer">Nur Sommer</button>
+      </div>
+    </div>
+    <div class="matrix-scroll"><table class="matrix" id="matrix"></table></div>
+    <p class="foot" style="margin:10px 0 0">Tipp: Auf ein Land oder eine Ferienart tippen schaltet die ganze Zeile bzw. Spalte um.</p>
+  </section>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="h-res">
+      <div class="panel-head"><h2 id="h-res">Ferienfreie Zeiträume</h2></div>
+      <div class="controls">
+        <label for="minLen">mind. <input type="number" id="minLen" min="1" max="200" value="7"> Tage</label>
+        <label for="hidePast"><input type="checkbox" id="hidePast" checked> vergangene ausblenden</label>
+      </div>
+      <p class="summary" id="summary"></p>
+      <ul class="periods" id="periods"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="h-cal">
+      <div class="panel-head">
+        <h2 id="h-cal">Kalender</h2>
+        <div class="tabs" role="tablist" id="tabs"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--free-bg);border:1px solid var(--free)"></span>ferienfrei</span>
+        <span>Ferien in 1<span class="ramp"></span>allen gewählten Ländern</span>
+        <span>Spalte links: KW</span>
+      </div>
+      <div class="months" id="months" style="margin-top:14px"></div>
+      <div class="detail" id="detail" aria-live="polite"><span class="empty">Tippe auf einen Tag, um zu sehen, wer dort Ferien hat.</span></div>
+    </section>
+  </div>
+
+  <p class="foot">Datenquelle: <a href="https://www.openholidaysapi.org" target="_blank" rel="noopener">OpenHolidays API</a>, abgerufen beim Öffnen der Seite (Ersatzdaten: Stand 05.10.2026). Mecklenburg-Vorpommern: allgemeinbildende Schulen. Schleswig-Holstein: ohne Sonderregelung der Nordseeinseln. Gesetzliche Feiertage sind keine Schulferien und werden nicht berücksichtigt. Ohne Gewähr, im Zweifel beim Kultusministerium des Landes prüfen.</p>
+</div>
+
+<script>
+const STATES=[["BW","Baden-Württemberg"],["BY","Bayern"],["BE","Berlin"],["BB","Brandenburg"],["HB","Bremen"],["HH","Hamburg"],["HE","Hessen"],["MV","Mecklenburg-Vorp."],["NI","Niedersachsen"],["NW","Nordrhein-Westfalen"],["RP","Rheinland-Pfalz"],["SL","Saarland"],["SN","Sachsen"],["ST","Sachsen-Anhalt"],["SH","Schleswig-Holstein"],["TH","Thüringen"]];
+const CATS=[["winter","Winter","Win"],["ostern","Ostern","Ost"],["pfingsten","Pfingsten","Pfi"],["sommer","Sommer","Som"],["herbst","Herbst","Her"],["weihnachten","Weihnachten","Wei"],["einzel","Einzeltage","Ein"]];
+// Land|Bezeichnung|Beginn|Ende
+const FALLBACK=`HH|Weihnachtsferien|2025-12-17|2026-01-02
+SH|Weihnachtsferien|2025-12-19|2026-01-06
+MV|Weihnachtsferien|2025-12-20|2026-01-03
+NW|Weihnachtsferien|2025-12-22|2026-01-06
+RP|Weihnachtsferien|2025-12-22|2026-01-07
+NI|Weihnachtsferien|2025-12-22|2026-01-05
+SN|Weihnachtsferien|2025-12-22|2026-01-02
+BW|Weihnachtsferien|2025-12-22|2026-01-05
+BB|Weihnachtsferien|2025-12-22|2026-01-02
+BE|Weihnachtsferien|2025-12-22|2026-01-02
+SL|Weihnachtsferien|2025-12-22|2026-01-02
+TH|Weihnachtsferien|2025-12-22|2026-01-03
+ST|Weihnachtsferien|2025-12-22|2026-01-05
+HB|Weihnachtsferien|2025-12-22|2026-01-05
+HE|Weihnachtsferien|2025-12-22|2026-01-10
+BY|Weihnachtsferien|2025-12-22|2026-01-05
+HH|Halbjahrespause|2026-01-30|2026-01-30
+ST|Winterferien|2026-01-31|2026-02-06
+HB|Halbjahresferien|2026-02-02|2026-02-03
+BB|Winterferien|2026-02-02|2026-02-07
+NI|Halbjahresferien|2026-02-02|2026-02-03
+BE|Winterferien|2026-02-02|2026-02-07
+MV|Winterferien|2026-02-09|2026-02-20
+SN|Winterferien|2026-02-09|2026-02-21
+BY|Frühjahrsferien|2026-02-16|2026-02-20
+SL|Fastnachtsferien|2026-02-16|2026-02-20
+TH|Winterferien|2026-02-16|2026-02-21
+HH|Frühjahrsferien|2026-03-02|2026-03-13
+NI|Osterferien|2026-03-23|2026-04-07
+HB|Osterferien|2026-03-23|2026-04-07
+SH|Osterferien|2026-03-26|2026-04-10
+BY|Osterferien|2026-03-30|2026-04-10
+MV|Osterferien|2026-03-30|2026-04-08
+BE|Osterferien|2026-03-30|2026-04-10
+ST|Osterferien|2026-03-30|2026-04-04
+NW|Osterferien|2026-03-30|2026-04-11
+BW|Osterferien|2026-03-30|2026-04-11
+HE|Osterferien|2026-03-30|2026-04-10
+BB|Osterferien|2026-03-30|2026-04-10
+RP|Osterferien|2026-03-30|2026-04-10
+SN|Osterferien|2026-04-03|2026-04-10
+SL|Osterferien|2026-04-07|2026-04-17
+TH|Osterferien|2026-04-07|2026-04-17
+HH|Pfingstferien|2026-05-11|2026-05-15
+SH|Himmelfahrt (Brückentag)|2026-05-15|2026-05-15
+HB|Tag nach Himmelfahrt|2026-05-15|2026-05-15
+MV|Zusätzlicher Ferientag|2026-05-15|2026-05-15
+NI|Tag nach Himmelfahrt|2026-05-15|2026-05-15
+SN|Unterrichtsfreier Tag|2026-05-15|2026-05-15
+TH|Schulfreier Tag|2026-05-15|2026-05-15
+BE|Unterrichtsfreier Tag|2026-05-15|2026-05-15
+BB|Variabler Ferientag|2026-05-15|2026-05-15
+MV|Pfingstferien|2026-05-22|2026-05-26
+NI|Pfingstferien|2026-05-26|2026-05-26
+BY|Pfingstferien|2026-05-26|2026-06-05
+BB|Pfingstferien|2026-05-26|2026-05-26
+BW|Pfingstferien|2026-05-26|2026-06-05
+HB|Pfingstferien|2026-05-26|2026-05-26
+NW|Pfingstferien|2026-05-26|2026-05-26
+BE|Pfingstferien|2026-05-26|2026-05-26
+ST|Pfingstferien|2026-05-26|2026-05-29
+SL|Sommerferien|2026-06-29|2026-08-07
+HE|Sommerferien|2026-06-29|2026-08-07
+RP|Sommerferien|2026-06-29|2026-08-07
+NI|Sommerferien|2026-07-02|2026-08-12
+HB|Sommerferien|2026-07-02|2026-08-12
+TH|Sommerferien|2026-07-04|2026-08-14
+SH|Sommerferien|2026-07-04|2026-08-15
+ST|Sommerferien|2026-07-04|2026-08-14
+SN|Sommerferien|2026-07-04|2026-08-14
+BE|Sommerferien|2026-07-09|2026-08-22
+BB|Sommerferien|2026-07-09|2026-08-22
+HH|Sommerferien|2026-07-09|2026-08-19
+MV|Sommerferien|2026-07-13|2026-08-22
+NW|Sommerferien|2026-07-20|2026-09-01
+BW|Sommerferien|2026-07-30|2026-09-12
+BY|Sommerferien|2026-08-03|2026-09-14
+HE|Herbstferien|2026-10-05|2026-10-17
+RP|Herbstferien|2026-10-05|2026-10-16
+SL|Herbstferien|2026-10-05|2026-10-16
+SN|Herbstferien|2026-10-12|2026-10-24
+SH|Herbstferien|2026-10-12|2026-10-24
+NI|Herbstferien|2026-10-12|2026-10-24
+TH|Herbstferien|2026-10-12|2026-10-24
+HB|Herbstferien|2026-10-12|2026-10-24
+MV|Herbstferien|2026-10-15|2026-10-24
+NW|Herbstferien|2026-10-17|2026-10-31
+BE|Herbstferien|2026-10-19|2026-10-31
+BB|Herbstferien|2026-10-19|2026-10-30
+HH|Herbstferien|2026-10-19|2026-10-30
+ST|Herbstferien|2026-10-19|2026-10-30
+BW|Herbstferien|2026-10-26|2026-10-30
+BW|Reformationsfest|2026-10-31|2026-10-31
+BY|Herbstferien|2026-11-02|2026-11-06
+BY|Buß- und Bettag|2026-11-18|2026-11-18
+MV|Zusätzlicher Ferientag|2026-11-26|2026-11-27
+MV|Weihnachtsferien|2026-12-21|2027-01-02
+HH|Weihnachtsferien|2026-12-21|2027-01-01
+SL|Weihnachtsferien|2026-12-21|2026-12-31
+ST|Weihnachtsferien|2026-12-21|2027-01-02
+SH|Weihnachtsferien|2026-12-21|2027-01-06
+BE|Weihnachtsferien|2026-12-23|2027-01-02
+HE|Weihnachtsferien|2026-12-23|2027-01-12
+BB|Weihnachtsferien|2026-12-23|2027-01-02
+HB|Weihnachtsferien|2026-12-23|2027-01-09
+SN|Weihnachtsferien|2026-12-23|2027-01-02
+RP|Weihnachtsferien|2026-12-23|2027-01-08
+BW|Weihnachtsferien|2026-12-23|2027-01-09
+TH|Weihnachtsferien|2026-12-23|2027-01-02
+NI|Weihnachtsferien|2026-12-23|2027-01-09
+NW|Weihnachtsferien|2026-12-23|2027-01-06
+BY|Weihnachtsferien|2026-12-24|2027-01-08
+HH|Halbjahrespause|2027-01-29|2027-01-29
+NI|Halbjahresferien|2027-02-01|2027-02-02
+BB|Winterferien|2027-02-01|2027-02-06
+ST|Winterferien|2027-02-01|2027-02-06
+BE|Winterferien|2027-02-01|2027-02-06
+TH|Winterferien|2027-02-01|2027-02-06
+HB|Halbjahresferien|2027-02-01|2027-02-02
+BY|Frühjahrsferien|2027-02-08|2027-02-12
+SN|Winterferien|2027-02-08|2027-02-19
+MV|Winterferien|2027-02-08|2027-02-19
+SL|Fastnachtsferien|2027-02-08|2027-02-12
+HH|Frühjahrsferien|2027-03-01|2027-03-12
+HE|Osterferien|2027-03-22|2027-04-02
+NI|Osterferien|2027-03-22|2027-04-03
+ST|Osterferien|2027-03-22|2027-03-27
+BY|Osterferien|2027-03-22|2027-04-02
+RP|Osterferien|2027-03-22|2027-04-02
+NW|Osterferien|2027-03-22|2027-04-03
+BB|Osterferien|2027-03-22|2027-04-03
+BE|Osterferien|2027-03-22|2027-04-02
+TH|Osterferien|2027-03-22|2027-04-03
+HB|Osterferien|2027-03-22|2027-04-03
+MV|Osterferien|2027-03-24|2027-04-02
+BW|Gründonnerstag|2027-03-25|2027-03-25
+SN|Osterferien|2027-03-26|2027-04-02
+BW|Osterferien|2027-03-30|2027-04-03
+SH|Osterferien|2027-03-30|2027-04-10
+SL|Osterferien|2027-03-30|2027-04-09
+TH|Schulfreier Tag|2027-05-07|2027-05-07
+SN|Unterrichtsfreier Tag|2027-05-07|2027-05-07
+NI|Tag nach Himmelfahrt|2027-05-07|2027-05-07
+SH|Himmelfahrt (Brückentag)|2027-05-07|2027-05-07
+BB|Variabler Ferientag|2027-05-07|2027-05-07
+HB|Tag nach Himmelfahrt|2027-05-07|2027-05-07
+BE|Unterrichtsfreier Tag|2027-05-07|2027-05-07
+MV|Zusätzlicher Ferientag|2027-05-07|2027-05-07
+HH|Pfingstferien|2027-05-07|2027-05-14
+MV|Pfingstferien|2027-05-14|2027-05-18
+ST|Pfingstferien|2027-05-15|2027-05-22
+SN|Pfingstferien|2027-05-15|2027-05-18
+BW|Pfingstferien|2027-05-18|2027-05-29
+BY|Pfingstferien|2027-05-18|2027-05-28
+BE|Pfingstferien|2027-05-18|2027-05-19
+NI|Pfingstferien|2027-05-18|2027-05-18
+BB|Pfingstferien|2027-05-18|2027-05-18
+HB|Pfingstferien|2027-05-18|2027-05-18
+NW|Pfingstferien|2027-05-18|2027-05-18
+SL|Sommerferien|2027-06-28|2027-08-06
+RP|Sommerferien|2027-06-28|2027-08-06
+HE|Sommerferien|2027-06-28|2027-08-06
+HH|Sommerferien|2027-07-01|2027-08-11
+BE|Sommerferien|2027-07-01|2027-08-14
+BB|Sommerferien|2027-07-01|2027-08-14
+SH|Sommerferien|2027-07-03|2027-08-14
+MV|Sommerferien|2027-07-05|2027-08-14
+HB|Sommerferien|2027-07-08|2027-08-18
+NI|Sommerferien|2027-07-08|2027-08-18
+ST|Sommerferien|2027-07-10|2027-08-20
+TH|Sommerferien|2027-07-10|2027-08-20
+SN|Sommerferien|2027-07-10|2027-08-20
+NW|Sommerferien|2027-07-19|2027-08-31
+BW|Sommerferien|2027-07-29|2027-09-11
+BY|Sommerferien|2027-08-02|2027-09-13
+RP|Herbstferien|2027-10-04|2027-10-15
+SL|Herbstferien|2027-10-04|2027-10-15
+HE|Herbstferien|2027-10-04|2027-10-16
+TH|Herbstferien|2027-10-09|2027-10-23
+SH|Herbstferien|2027-10-11|2027-10-23
+BB|Herbstferien|2027-10-11|2027-10-23
+BE|Herbstferien|2027-10-11|2027-10-23
+HH|Herbstferien|2027-10-11|2027-10-22
+SN|Herbstferien|2027-10-11|2027-10-23
+MV|Herbstferien|2027-10-14|2027-10-23
+NI|Herbstferien|2027-10-16|2027-10-30
+HB|Herbstferien|2027-10-18|2027-10-30
+ST|Herbstferien|2027-10-18|2027-10-23
+NW|Herbstferien|2027-10-23|2027-11-06
+BY|Herbstferien|2027-11-02|2027-11-05
+BW|Herbstferien|2027-11-02|2027-11-06
+BY|Buß- und Bettag|2027-11-17|2027-11-17
+MV|Zusätzlicher Ferientag|2027-11-25|2027-11-26
+ST|Weihnachtsferien|2027-12-20|2027-12-31
+HH|Weihnachtsferien|2027-12-20|2027-12-31
+SL|Weihnachtsferien|2027-12-20|2027-12-31
+MV|Weihnachtsferien|2027-12-22|2028-01-04
+BE|Weihnachtsferien|2027-12-22|2027-12-31
+BB|Weihnachtsferien|2027-12-23|2027-12-31
+TH|Weihnachtsferien|2027-12-23|2027-12-31
+NI|Weihnachtsferien|2027-12-23|2028-01-08
+SN|Weihnachtsferien|2027-12-23|2028-01-01
+BW|Weihnachtsferien|2027-12-23|2028-01-08
+HB|Weihnachtsferien|2027-12-23|2028-01-08
+SH|Weihnachtsferien|2027-12-23|2028-01-08
+HE|Weihnachtsferien|2027-12-23|2028-01-11
+RP|Weihnachtsferien|2027-12-23|2028-01-07
+BY|Weihnachtsferien|2027-12-24|2028-01-07
+NW|Weihnachtsferien|2027-12-24|2028-01-08`;
+
+const DAY=864e5;
+const toIdx=s=>{const[y,m,d]=s.split("-").map(Number);return Date.UTC(y,m-1,d)/DAY};
+const fromIdx=i=>new Date(i*DAY);
+const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
+const MON=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const fmt=i=>{const d=fromIdx(i);return `${String(d.getUTCDate()).padStart(2,"0")}.${String(d.getUTCMonth()+1).padStart(2,"0")}.${d.getUTCFullYear()}`};
+const fmtShort=i=>{const d=fromIdx(i);return `${WD[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,"0")}.${String(d.getUTCMonth()+1).padStart(2,"0")}.`};
+function isoWeek(i){const d=fromIdx(i);const day=(d.getUTCDay()+6)%7;const th=new Date(d.getTime()+(3-day)*DAY);const y=th.getUTCFullYear();const jan4=new Date(Date.UTC(y,0,4));return 1+Math.round(((th-jan4)/DAY-3+((jan4.getUTCDay()+6)%7))/7)}
+function category(name,start){
+  if(name.startsWith("Weihnacht"))return"weihnachten";
+  if(name.startsWith("Sommer"))return"sommer";
+  if(name.startsWith("Herbst"))return"herbst";
+  if(name.startsWith("Pfingst"))return"pfingsten";
+  if(name.startsWith("Oster")||name==="Gründonnerstag")return"ostern";
+  if(name.startsWith("Frühjahr"))return Number(start.slice(5,7))<=2?"winter":"ostern";
+  if(/^(Winter|Halbjahresferien|Fastnacht)/.test(name))return"winter";
+  return"einzel";
+}
+const mk=(st,name,a,b)=>({st,name,cat:category(name,a),a:toIdx(a),b:toIdx(b)});
+const parseFallback=()=>FALLBACK.trim().split("\n").map(l=>mk(...l.split("|")));
+const now=new Date();const TODAY=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/DAY;
+const API="https://openholidaysapi.org/SchoolHolidays";
+
+// Ein API-Eintrag kann mehrere Länder betreffen. MV: nur allgemeinbildende Schulen (MV-ABS). SH: Inselregelung (tag "Exception") auslassen.
+function fromApi(list){
+  const out=[];
+  list.forEach(h=>{
+    if((h.tags||[]).includes("Exception"))return;
+    if(h.groups&&h.groups.length&&!h.groups.some(g=>g.code==="DE-MV-ABS"))return;
+    const name=(h.name.find(n=>n.language==="DE")||h.name[0]).text;
+    (h.subdivisions||[]).forEach(s=>{const st=s.shortName.split("-")[0];if(STATES.some(([c])=>c===st))out.push(mk(st,name,h.startDate,h.endDate))});
+  });
+  return out;
+}
+async function fetchYear(y){
+  const u=`${API}?countryIsoCode=DE&languageIsoCode=DE&validFrom=${y}-01-01&validTo=${y}-12-31`;
+  const r=await fetch(u,{headers:{accept:"application/json"}});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function loadEntries(){
+  const y0=now.getFullYear();const years=[y0,y0+1,y0+2];
+  const res=await Promise.allSettled(years.map(fetchYear));
+  const seen=new Set(),raw=[];
+  res.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(h=>{if(!seen.has(h.id)){seen.add(h.id);raw.push(h)}})});
+  if(!raw.length)throw new Error("keine Daten");
+  return fromApi(raw);
+}
+
+let ENTRIES=[],YEARS=[],W0=0,W1=0,byDay=[];
+function initData(entries){
+  ENTRIES=entries;
+  // Ein Jahr gilt als vorhanden, wenn es Sommerferien für mindestens 12 Länder enthält
+  const counts={};entries.forEach(e=>{if(e.cat==="sommer"){const y=fromIdx(e.a).getUTCFullYear();(counts[y]=counts[y]||new Set()).add(e.st)}});
+  YEARS=Object.keys(counts).map(Number).filter(y=>counts[y].size>=12).sort();
+  if(!YEARS.length)YEARS=[now.getFullYear()];
+  W0=toIdx(YEARS[0]+"-01-01");W1=toIdx(YEARS[YEARS.length-1]+"-12-31");
+  byDay=[];for(let i=W0;i<=W1;i++)byDay.push([]);
+  entries.forEach(e=>{for(let i=Math.max(e.a,W0);i<=Math.min(e.b,W1);i++)byDay[i-W0].push(e)});
+  if(!YEARS.includes(state.year))state.year=YEARS.includes(now.getFullYear())?now.getFullYear():YEARS[0];
+}
+
+// Auswahl: Set aus "ST:cat"
+let sel=new Set();
+const key=(s,c)=>s+":"+c;
+function setAll(fn){sel=new Set();STATES.forEach(([s])=>CATS.forEach(([c])=>{if(fn(s,c))sel.add(key(s,c))}))}
+let state={year:now.getFullYear(),minLen:7,hidePast:true,picked:null,period:null};
+try{const saved=JSON.parse(localStorage.getItem("ferienfrei")||"null");if(saved&&Array.isArray(saved.sel)){sel=new Set(saved.sel);state.minLen=saved.minLen||7;state.hidePast=saved.hidePast!==false}else setAll(()=>true)}catch(e){setAll(()=>true)}
+function save(){try{localStorage.setItem("ferienfrei",JSON.stringify({sel:[...sel],minLen:state.minLen,hidePast:state.hidePast}))}catch(e){}}
+
+// Matrix
+const matrix=document.getElementById("matrix");
+function buildMatrix(){
+  let h='<thead><tr><th scope="col"><span class="label">Land</span></th>';
+  CATS.forEach(([c,l,s])=>h+=`<th scope="col"><button data-col="${c}" title="Spalte ${l} umschalten"><span class="long">${l}</span><span class="short">${s}</span></button></th>`);
+  h+='</tr></thead><tbody>';
+  STATES.forEach(([s,n])=>{
+    h+=`<tr><th scope="row"><button data-row="${s}" title="${n}: alle umschalten"><span class="code">${s}</span><span class="sname">${n}</span></button></th>`;
+    CATS.forEach(([c,l])=>h+=`<td><label class="cell"><input type="checkbox" id="cb-${s}-${c}" data-k="${key(s,c)}" aria-label="${n}, ${l}"></label></td>`);
+    h+='</tr>';
+  });
+  matrix.innerHTML=h+'</tbody>';
+}
+function syncMatrix(){matrix.querySelectorAll("input[data-k]").forEach(i=>i.checked=sel.has(i.dataset.k))}
+matrix.addEventListener("change",e=>{const k=e.target.dataset.k;if(!k)return;e.target.checked?sel.add(k):sel.delete(k);update()});
+matrix.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const keys=b.dataset.row?CATS.map(([c])=>key(b.dataset.row,c)):STATES.map(([s])=>key(s,b.dataset.col));
+  const allOn=keys.every(k=>sel.has(k));keys.forEach(k=>allOn?sel.delete(k):sel.add(k));update();
+});
+document.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click",()=>{
+  const p=b.dataset.preset;
+  setAll((s,c)=>p==="all"||(p==="main"&&c!=="einzel")||(p==="summer"&&c==="sommer"));update();
+}));
+
+// Berechnung
+function activeOn(i){return byDay[i-W0].filter(e=>sel.has(key(e.st,e.cat)))}
+function computePeriods(){
+  const out=[];let start=null;
+  for(let i=W0;i<=W1+1;i++){
+    const free=i<=W1&&activeOn(i).length===0;
+    if(free&&start===null)start=i;
+    if(!free&&start!==null){out.push({a:start,b:i-1});start=null}
+  }
+  return out;
+}
+const workdays=(a,b)=>{let n=0;for(let i=a;i<=b;i++){const w=fromIdx(i).getUTCDay();if(w>0&&w<6)n++}return n};
+
+const periodsEl=document.getElementById("periods"),summaryEl=document.getElementById("summary");
+function renderPeriods(all){
+  const yA=toIdx(state.year+"-01-01"),yB=toIdx(state.year+"-12-31");
+  const list=all.filter(p=>p.b>=yA&&p.a<=yB&&(p.b-p.a+1)>=state.minLen&&!(state.hidePast&&p.b<TODAY));
+  const freeDays=all.reduce((n,p)=>n+Math.max(0,Math.min(p.b,yB)-Math.max(p.a,yA)+1),0);
+  const nStates=new Set([...sel].map(k=>k.split(":")[0])).size;
+  summaryEl.innerHTML=sel.size===0?"Keine Ferien ausgewählt, das ganze Jahr ist frei.":`${state.year}: <b>${freeDays}</b> ferienfreie Tage, <b>${list.length}</b> Zeiträume ab ${state.minLen} Tagen · ${nStates} ${nStates===1?"Land":"Länder"} aktiv`;
+  if(!list.length){periodsEl.innerHTML='<li class="empty">Kein passender Zeitraum. Verringere die Mindestlänge oder wähle weniger Ferien aus.</li>';return}
+  periodsEl.innerHTML=list.map(p=>{
+    const len=p.b-p.a+1,on=state.period&&state.period.a===p.a;
+    const cutA=p.a===W0?" (ab Datenbeginn)":"",cutB=p.b===W1?" (bis Datenende)":"";
+    return `<li><button class="period${p.b<TODAY?" past":""}" data-a="${p.a}" data-b="${p.b}" aria-pressed="${on}">
+      <span class="p-dates">${fmtShort(p.a)} – ${fmtShort(p.b)}${p.a<yA||p.b>yB?" "+fromIdx(p.b).getUTCFullYear():""}</span>
+      <span class="p-len">${len} T</span>
+      <span class="p-meta">KW ${isoWeek(p.a)}–${isoWeek(p.b)} · ${workdays(p.a,p.b)} Werktage${cutA}${cutB}</span></button></li>`}).join("");
+}
+periodsEl.addEventListener("click",e=>{
+  const b=e.target.closest(".period");if(!b)return;
+  const a=+b.dataset.a,bb=+b.dataset.b;
+  state.period=state.period&&state.period.a===a?null:{a,b:bb};
+  const y=fromIdx(a).getUTCFullYear();if(state.period&&YEARS.includes(y))state.year=y;
+  render();
+  if(state.period){const el=document.querySelector(`.day[data-i="${a}"]`);el&&el.scrollIntoView({block:"nearest",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
+});
+
+// Kalender
+const monthsEl=document.getElementById("months"),tabsEl=document.getElementById("tabs");
+function renderTabs(){tabsEl.innerHTML=YEARS.map(y=>`<button class="tab" role="tab" aria-selected="${y===state.year}" data-y="${y}">${y}</button>`).join("")}
+tabsEl.addEventListener("click",e=>{const b=e.target.closest("[data-y]");if(!b)return;state.year=+b.dataset.y;state.period=null;render()});
+function renderCalendar(){
+  const nStates=Math.max(1,new Set([...sel].map(k=>k.split(":")[0])).size);
+  let h="";
+  for(let m=0;m<12;m++){
+    const first=Date.UTC(state.year,m,1)/DAY,last=Date.UTC(state.year,m+1,0)/DAY;
+    const lead=(fromIdx(first).getUTCDay()+6)%7;
+    h+=`<div class="month"><h3>${MON[m]}</h3><div class="mgrid"><span></span>${["Mo","Di","Mi","Do","Fr","Sa","So"].map(w=>`<span class="wd">${w}</span>`).join("")}`;
+    let i=first-lead;
+    while(i<=last){
+      h+=`<span class="kw">${isoWeek(i)}</span>`;
+      for(let k=0;k<7;k++,i++){
+        if(i<first||i>last){h+="<span></span>";continue}
+        const act=activeOn(i),n=new Set(act.map(e=>e.st)).size,dow=fromIdx(i).getUTCDay();
+        let cls="day"+(dow===0||dow===6?" we":"");let style="";
+        if(n===0)cls+=" free";else{const a=.18+.82*(n/nStates);cls+=" hol"+(a>.6?" hot":"");style=`background:rgba(var(--hol-rgb),${a.toFixed(2)})`}
+        if(state.period&&i>=state.period.a&&i<=state.period.b)cls+=" sel";
+        if(i===TODAY)cls+=" today";if(i===state.picked)cls+=" picked";
+        h+=`<button class="${cls}" style="${style}" data-i="${i}" aria-label="${fmt(i)}: ${n?n+" Länder mit Ferien":"ferienfrei"}">${fromIdx(i).getUTCDate()}</button>`;
+      }
+    }
+    h+="</div></div>";
+  }
+  monthsEl.innerHTML=h;
+}
+const detailEl=document.getElementById("detail");
+monthsEl.addEventListener("click",e=>{const b=e.target.closest(".day");if(!b)return;state.picked=+b.dataset.i;renderCalendar();renderDetail()});
+function renderDetail(){
+  if(state.picked==null)return;
+  const i=state.picked,act=activeOn(i),all=byDay[i-W0];
+  const name=Object.fromEntries(STATES);
+  const d=fromIdx(i);const head=`<b>${WD[d.getUTCDay()]}, ${fmt(i)}</b> · KW ${isoWeek(i)}`;
+  const off=all.filter(e=>!sel.has(key(e.st,e.cat)));
+  let h=head+(act.length?`<ul>${act.map(e=>`<li><b>${e.st}</b> ${name[e.st]}: ${e.name}</li>`).join("")}</ul>`:` · <span style="color:var(--free);font-weight:600">ferienfrei</span>`);
+  if(off.length)h+=`<p class="foot" style="margin:6px 0 0">Abgewählt, aber an diesem Tag Ferien: ${off.map(e=>e.st+" ("+e.name+")").join(", ")}</p>`;
+  detailEl.innerHTML=h;
+}
+
+// Steuerung
+const minLenEl=document.getElementById("minLen"),hidePastEl=document.getElementById("hidePast");
+minLenEl.value=state.minLen;hidePastEl.checked=state.hidePast;
+minLenEl.addEventListener("input",()=>{const v=parseInt(minLenEl.value,10);if(v>0){state.minLen=v;save();renderPeriods(computePeriods())}});
+hidePastEl.addEventListener("change",()=>{state.hidePast=hidePastEl.checked;save();renderPeriods(computePeriods())});
+
+function render(){if(!byDay.length)return;renderTabs();renderPeriods(computePeriods());renderCalendar();renderDetail()}
+function update(){syncMatrix();if(state.period){const ps=computePeriods();if(!ps.some(p=>p.a===state.period.a&&p.b===state.period.b))state.period=null}save();render()}
+const statusDot=document.querySelector("#status .dot"),statusText=document.getElementById("statusText"),reloadBtn=document.getElementById("reload");
+async function boot(){
+  statusDot.className="dot";statusText.textContent="Lade Ferientermine …";reloadBtn.hidden=true;
+  try{
+    initData(await loadEntries());
+    statusDot.className="dot live";
+    statusText.textContent=`Live-Daten · ${YEARS[0]}–${YEARS[YEARS.length-1]} · abgerufen ${now.toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}`;
+  }catch(err){
+    initData(parseFallback());
+    statusDot.className="dot offline";
+    statusText.textContent=`API nicht erreichbar (${err.message}). Zeige gespeicherte Daten, Stand 05.10.2026.`;
+    reloadBtn.hidden=false;
+  }
+  state.period=null;state.picked=null;render();
+}
+reloadBtn.addEventListener("click",boot);
+buildMatrix();syncMatrix();boot();
+</script>
+</body>
+</html>

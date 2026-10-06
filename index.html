@@ -11,18 +11,18 @@
 /* Layout: Werkzeugleiste oben (Auswahlmatrix Land × Ferienart), darunter Ergebnisliste und Jahreskalender mit KW-Spalte */
 :root{
   --bg:#f3f5f6; --surface:#ffffff; --fg:#17222b; --muted:#5d6b76; --line:#d9dfe3;
-  --free:#1f7a5c; --free-bg:#d6efe5; --hol:#c2571a; --hol-rgb:194,87,26;
+  --free:#1f7a5c; --free-bg:#d6efe5; --hol:#c2571a; --hol-rgb:194,87,26; --fei:#7442c8; --fei-bg:#e4d9f7;
   --accent:#24537a; --focus:#24537a; --weekend:#eef1f3;
   --f-display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#11171c; --surface:#18212a; --fg:#e6ecf0; --muted:#93a2ad; --line:#2a3743;
-  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75;
+  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75; --fei:#a982ee; --fei-bg:#382a55;
   --accent:#8bb8e0; --focus:#8bb8e0; --weekend:#1c2731; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#11171c; --surface:#18212a; --fg:#e6ecf0; --muted:#93a2ad; --line:#2a3743;
-  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75;
+  --free:#5fd1a5; --free-bg:#16392e; --hol:#f08a4b; --hol-rgb:240,138,75; --fei:#a982ee; --fei-bg:#382a55;
   --accent:#8bb8e0; --focus:#8bb8e0; --weekend:#1c2731; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -81,14 +81,21 @@ input[type=number]{width:4.5em;font:inherit;padding:3px 6px;border:1px solid var
 .mgrid .kw{color:var(--muted);font-size:.66rem;display:grid;place-items:center}
 .day{aspect-ratio:1;border:0;border-radius:4px;padding:0;display:grid;place-items:center;background:var(--weekend);color:var(--fg);font-size:.78rem;position:relative;max-width:100%}
 .day.free{background:var(--free-bg);color:var(--fg)}
+.day{overflow:hidden}
+.day.fei{background:var(--fei-bg);color:var(--fg);font-weight:600}
+.day.fei.all{background:var(--fei);color:#fff}
+.day.feimark::before{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 8px 8px 0;border-color:transparent var(--fei) transparent transparent}
 .day.we.free{background:color-mix(in srgb,var(--free-bg) 70%,var(--weekend))}
 .day.hol{color:var(--fg)}
 .day.hot{color:#fff}
 .day.sel{outline:2px solid var(--free);outline-offset:-1px}
+.day.fei.all.today::after{background:#fff}
 .day.today::after{content:"";position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
 .day.picked{outline:2px solid var(--accent);outline-offset:-1px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:.82rem;color:var(--muted)}
 .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.sw.mark{position:relative;overflow:hidden;background:rgba(var(--hol-rgb),.5)}
+.sw.mark::before{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent var(--fei) transparent transparent}
 .ramp{width:90px;height:10px;border-radius:3px;background:linear-gradient(90deg,rgba(var(--hol-rgb),.15),rgba(var(--hol-rgb),1));display:inline-block;vertical-align:middle;margin:0 4px}
 .detail{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:.9rem;min-height:2.5em}
 .detail ul{margin:6px 0 0;padding-left:1.1em;columns:2 220px}
@@ -131,6 +138,7 @@ input[type=number]{width:4.5em;font:inherit;padding:3px 6px;border:1px solid var
       <div class="controls">
         <label for="minLen">mind. <input type="number" id="minLen" min="1" max="200" value="7"> Tage</label>
         <label for="hidePast"><input type="checkbox" id="hidePast" checked> vergangene ausblenden</label>
+        <label for="countFei"><input type="checkbox" id="countFei"> Feiertage unterbrechen Zeiträume</label>
       </div>
       <p class="summary" id="summary"></p>
       <ul class="periods" id="periods"></ul>
@@ -144,14 +152,17 @@ input[type=number]{width:4.5em;font:inherit;padding:3px 6px;border:1px solid var
       <div class="legend">
         <span><span class="sw" style="background:var(--free-bg);border:1px solid var(--free)"></span>ferienfrei</span>
         <span>Ferien in 1<span class="ramp"></span>allen gewählten Ländern</span>
+        <span><span class="sw" style="background:var(--fei)"></span>Feiertag in allen</span>
+        <span><span class="sw" style="background:var(--fei-bg);border:1px solid var(--fei)"></span>Feiertag in einigen Ländern</span>
+        <span><span class="sw mark"></span>Feiertag in den Ferien</span>
         <span>Spalte links: KW</span>
       </div>
       <div class="months" id="months" style="margin-top:14px"></div>
-      <div class="detail" id="detail" aria-live="polite"><span class="empty">Tippe auf einen Tag, um zu sehen, wer dort Ferien hat.</span></div>
+      <div class="detail" id="detail" aria-live="polite"><span class="empty">Tippe auf einen Tag, um zu sehen, wer dort Ferien oder Feiertag hat.</span></div>
     </section>
   </div>
 
-  <p class="foot">Datenquelle: <a href="https://www.openholidaysapi.org" target="_blank" rel="noopener">OpenHolidays API</a>, abgerufen beim Öffnen der Seite (Ersatzdaten: Stand 05.10.2026). Mecklenburg-Vorpommern: allgemeinbildende Schulen. Schleswig-Holstein: ohne Sonderregelung der Nordseeinseln. Gesetzliche Feiertage sind keine Schulferien und werden nicht berücksichtigt. Ohne Gewähr, im Zweifel beim Kultusministerium des Landes prüfen.</p>
+  <p class="foot">Datenquelle: <a href="https://www.openholidaysapi.org" target="_blank" rel="noopener">OpenHolidays API</a>, abgerufen beim Öffnen der Seite (Ersatzdaten: Stand 06.10.2026). Mecklenburg-Vorpommern: allgemeinbildende Schulen. Schleswig-Holstein: ohne Sonderregelung der Nordseeinseln. Feiertage gelten für die Länder, in denen mindestens eine Ferienart ausgewählt ist. Nur landesweite Feiertage, ohne örtliche wie das Augsburger Friedensfest. Ohne Gewähr, im Zweifel beim Kultusministerium des Landes prüfen.</p>
 </div>
 
 <script>
@@ -386,10 +397,51 @@ function category(name,start){
   if(/^(Winter|Halbjahresferien|Fastnacht)/.test(name))return"winter";
   return"einzel";
 }
+// Datum|Name|Länder (* = bundesweit)
+const FEI_FALLBACK=`2026-01-01|Neujahr|*
+2026-01-06|Heilige Drei Könige|BW,BY,ST
+2026-03-08|Internationaler Frauentag|BE,MV
+2026-04-03|Karfreitag|*
+2026-04-05|Ostersonntag|BB
+2026-04-06|Ostermontag|*
+2026-05-01|Tag der Arbeit|*
+2026-05-14|Christi Himmelfahrt|*
+2026-05-24|Pfingstsonntag|BB
+2026-05-25|Pfingstmontag|*
+2026-06-04|Fronleichnam|BW,BY,HE,NW,RP,SL
+2026-08-15|Mariä Himmelfahrt|BY,SL
+2026-09-20|Weltkindertag|TH
+2026-10-03|Tag der Deutschen Einheit|*
+2026-10-31|Reformationstag|BB,HB,HH,MV,NI,SN,ST,SH,TH
+2026-11-01|Allerheiligen|BW,BY,NW,RP,SL
+2026-11-18|Buß- und Bettag|SN
+2026-12-25|1. Weihnachtsfeiertag|*
+2026-12-26|2. Weihnachtsfeiertag|*
+2027-01-01|Neujahr|*
+2027-01-06|Heilige Drei Könige|BW,BY,ST
+2027-03-08|Internationaler Frauentag|BE,MV
+2027-03-26|Karfreitag|*
+2027-03-28|Ostersonntag|BB
+2027-03-29|Ostermontag|*
+2027-05-01|Tag der Arbeit|*
+2027-05-06|Christi Himmelfahrt|*
+2027-05-16|Pfingstsonntag|BB
+2027-05-17|Pfingstmontag|*
+2027-05-27|Fronleichnam|BW,BY,HE,NW,RP,SL
+2027-08-15|Mariä Himmelfahrt|BY,SL
+2027-09-20|Weltkindertag|TH
+2027-10-03|Tag der Deutschen Einheit|*
+2027-10-31|Reformationstag|BB,HB,HH,MV,NI,SN,ST,SH,TH
+2027-11-01|Allerheiligen|BW,BY,NW,RP,SL
+2027-11-17|Buß- und Bettag|SN
+2027-12-25|1. Weihnachtsfeiertag|*
+2027-12-26|2. Weihnachtsfeiertag|*`;
+const parseFeiFallback=()=>FEI_FALLBACK.trim().split("\n").map(l=>{const[d,name,st]=l.split("|");return{i:toIdx(d),name,states:st==="*"?null:st.split(",")}});
 const mk=(st,name,a,b)=>({st,name,cat:category(name,a),a:toIdx(a),b:toIdx(b)});
 const parseFallback=()=>FALLBACK.trim().split("\n").map(l=>mk(...l.split("|")));
 const now=new Date();const TODAY=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/DAY;
-const API="https://openholidaysapi.org/SchoolHolidays";
+const OFFLINE=false;
+const API="https://openholidaysapi.org/SchoolHolidays",API_PUB="https://openholidaysapi.org/PublicHolidays";
 
 // Ein API-Eintrag kann mehrere Länder betreffen. MV: nur allgemeinbildende Schulen (MV-ABS). SH: Inselregelung (tag "Exception") auslassen.
 function fromApi(list){
@@ -402,23 +454,40 @@ function fromApi(list){
   });
   return out;
 }
-async function fetchYear(y){
-  const u=`${API}?countryIsoCode=DE&languageIsoCode=DE&validFrom=${y}-01-01&validTo=${y}-12-31`;
+function feiFromApi(list){
+  const out=[];
+  list.forEach(h=>{
+    if(h.regionalScope==="Local")return;
+    const name=(h.name.find(n=>n.language==="DE")||h.name[0]).text;
+    const states=h.nationwide?null:[...new Set((h.subdivisions||[]).map(s=>s.shortName.split("-")[0]))].filter(st=>STATES.some(([c])=>c===st));
+    if(states&&!states.length)return;
+    for(let i=toIdx(h.startDate);i<=toIdx(h.endDate);i++)out.push({i,name,states});
+  });
+  return out;
+}
+async function fetchYear(y,api=API){
+  const u=`${api}?countryIsoCode=DE&languageIsoCode=DE&validFrom=${y}-01-01&validTo=${y}-12-31`;
   const r=await fetch(u,{headers:{accept:"application/json"}});
   if(!r.ok)throw new Error("HTTP "+r.status);
   return r.json();
 }
-async function loadEntries(){
+async function fetchAll(api){
   const y0=now.getFullYear();const years=[y0,y0+1,y0+2];
-  const res=await Promise.allSettled(years.map(fetchYear));
+  const res=await Promise.allSettled(years.map(y=>fetchYear(y,api)));
   const seen=new Set(),raw=[];
   res.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(h=>{if(!seen.has(h.id)){seen.add(h.id);raw.push(h)}})});
-  if(!raw.length)throw new Error("keine Daten");
-  return fromApi(raw);
+  return raw;
+}
+async function loadEntries(){
+  if(OFFLINE)throw new Error("offline");
+  const [school,pub]=await Promise.all([fetchAll(API),fetchAll(API_PUB)]);
+  if(!school.length)throw new Error("keine Daten");
+  const fei=feiFromApi(pub);
+  return{entries:fromApi(school),fei:fei.length?fei:parseFeiFallback()};
 }
 
-let ENTRIES=[],YEARS=[],W0=0,W1=0,byDay=[];
-function initData(entries){
+let ENTRIES=[],YEARS=[],W0=0,W1=0,byDay=[],feiByDay=[],REL=new Set();
+function initData({entries,fei}){
   ENTRIES=entries;
   // Ein Jahr gilt als vorhanden, wenn es Sommerferien für mindestens 12 Länder enthält
   const counts={};entries.forEach(e=>{if(e.cat==="sommer"){const y=fromIdx(e.a).getUTCFullYear();(counts[y]=counts[y]||new Set()).add(e.st)}});
@@ -427,6 +496,8 @@ function initData(entries){
   W0=toIdx(YEARS[0]+"-01-01");W1=toIdx(YEARS[YEARS.length-1]+"-12-31");
   byDay=[];for(let i=W0;i<=W1;i++)byDay.push([]);
   entries.forEach(e=>{for(let i=Math.max(e.a,W0);i<=Math.min(e.b,W1);i++)byDay[i-W0].push(e)});
+  feiByDay=byDay.map(()=>[]);
+  fei.forEach(f=>{if(f.i>=W0&&f.i<=W1)feiByDay[f.i-W0].push(f)});
   if(!YEARS.includes(state.year))state.year=YEARS.includes(now.getFullYear())?now.getFullYear():YEARS[0];
 }
 
@@ -434,9 +505,9 @@ function initData(entries){
 let sel=new Set();
 const key=(s,c)=>s+":"+c;
 function setAll(fn){sel=new Set();STATES.forEach(([s])=>CATS.forEach(([c])=>{if(fn(s,c))sel.add(key(s,c))}))}
-let state={year:now.getFullYear(),minLen:7,hidePast:true,picked:null,period:null};
-try{const saved=JSON.parse(localStorage.getItem("ferienfrei")||"null");if(saved&&Array.isArray(saved.sel)){sel=new Set(saved.sel);state.minLen=saved.minLen||7;state.hidePast=saved.hidePast!==false}else setAll(()=>true)}catch(e){setAll(()=>true)}
-function save(){try{localStorage.setItem("ferienfrei",JSON.stringify({sel:[...sel],minLen:state.minLen,hidePast:state.hidePast}))}catch(e){}}
+let state={year:now.getFullYear(),minLen:7,hidePast:true,countFei:false,picked:null,period:null};
+try{const saved=JSON.parse(localStorage.getItem("ferienfrei")||"null");if(saved&&Array.isArray(saved.sel)){sel=new Set(saved.sel);state.minLen=saved.minLen||7;state.hidePast=saved.hidePast!==false;state.countFei=!!saved.countFei}else setAll(()=>true)}catch(e){setAll(()=>true)}
+function save(){try{localStorage.setItem("ferienfrei",JSON.stringify({sel:[...sel],minLen:state.minLen,hidePast:state.hidePast,countFei:state.countFei}))}catch(e){}}
 
 // Matrix
 const matrix=document.getElementById("matrix");
@@ -465,15 +536,19 @@ document.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click"
 
 // Berechnung
 function activeOn(i){return byDay[i-W0].filter(e=>sel.has(key(e.st,e.cat)))}
+function relStates(){const r=new Set([...sel].map(k=>k.split(":")[0]));return r.size?r:new Set(STATES.map(([s])=>s))}
+function feiOn(i){return(feiByDay[i-W0]||[]).filter(f=>!f.states||f.states.some(s=>REL.has(s)))}
+const feiAll=f=>!f.states||[...REL].every(s=>f.states.includes(s));
 function computePeriods(){
   const out=[];let start=null;
   for(let i=W0;i<=W1+1;i++){
-    const free=i<=W1&&activeOn(i).length===0;
+    const free=i<=W1&&activeOn(i).length===0&&!(state.countFei&&feiOn(i).length);
     if(free&&start===null)start=i;
     if(!free&&start!==null){out.push({a:start,b:i-1});start=null}
   }
   return out;
 }
+const feiCount=(a,b)=>{let n=0;for(let i=a;i<=b;i++){const w=fromIdx(i).getUTCDay();if(w>0&&w<6&&feiOn(i).length)n++}return n};
 const workdays=(a,b)=>{let n=0;for(let i=a;i<=b;i++){const w=fromIdx(i).getUTCDay();if(w>0&&w<6)n++}return n};
 
 const periodsEl=document.getElementById("periods"),summaryEl=document.getElementById("summary");
@@ -490,7 +565,7 @@ function renderPeriods(all){
     return `<li><button class="period${p.b<TODAY?" past":""}" data-a="${p.a}" data-b="${p.b}" aria-pressed="${on}">
       <span class="p-dates">${fmtShort(p.a)} – ${fmtShort(p.b)}${p.a<yA||p.b>yB?" "+fromIdx(p.b).getUTCFullYear():""}</span>
       <span class="p-len">${len} T</span>
-      <span class="p-meta">KW ${isoWeek(p.a)}–${isoWeek(p.b)} · ${workdays(p.a,p.b)} Werktage${cutA}${cutB}</span></button></li>`}).join("");
+      <span class="p-meta">KW ${isoWeek(p.a)}–${isoWeek(p.b)} · ${workdays(p.a,p.b)} Werktage${(fc=>fc?` · ${fc} Feiertag${fc>1?"e":""}`:"")(feiCount(p.a,p.b))}${cutA}${cutB}</span></button></li>`}).join("");
 }
 periodsEl.addEventListener("click",e=>{
   const b=e.target.closest(".period");if(!b)return;
@@ -519,10 +594,12 @@ function renderCalendar(){
         if(i<first||i>last){h+="<span></span>";continue}
         const act=activeOn(i),n=new Set(act.map(e=>e.st)).size,dow=fromIdx(i).getUTCDay();
         let cls="day"+(dow===0||dow===6?" we":"");let style="";
-        if(n===0)cls+=" free";else{const a=.18+.82*(n/nStates);cls+=" hol"+(a>.6?" hot":"");style=`background:rgba(var(--hol-rgb),${a.toFixed(2)})`}
+        const fei=feiOn(i);
+        if(n===0)cls+=fei.length?" fei"+(fei.some(feiAll)?" all":""):" free";
+        else{const a=.18+.82*(n/nStates);cls+=" hol"+(a>.6?" hot":"")+(fei.length?" feimark":"");style=`background:rgba(var(--hol-rgb),${a.toFixed(2)})`}
         if(state.period&&i>=state.period.a&&i<=state.period.b)cls+=" sel";
         if(i===TODAY)cls+=" today";if(i===state.picked)cls+=" picked";
-        h+=`<button class="${cls}" style="${style}" data-i="${i}" aria-label="${fmt(i)}: ${n?n+" Länder mit Ferien":"ferienfrei"}">${fromIdx(i).getUTCDate()}</button>`;
+        h+=`<button class="${cls}" style="${style}" data-i="${i}" aria-label="${fmt(i)}: ${n?n+" Länder mit Ferien":"ferienfrei"}${fei.length?", "+fei.map(f=>f.name).join(", "):""}">${fromIdx(i).getUTCDate()}</button>`;
       }
     }
     h+="</div></div>";
@@ -538,6 +615,8 @@ function renderDetail(){
   const d=fromIdx(i);const head=`<b>${WD[d.getUTCDay()]}, ${fmt(i)}</b> · KW ${isoWeek(i)}`;
   const off=all.filter(e=>!sel.has(key(e.st,e.cat)));
   let h=head+(act.length?`<ul>${act.map(e=>`<li><b>${e.st}</b> ${name[e.st]}: ${e.name}</li>`).join("")}</ul>`:` · <span style="color:var(--free);font-weight:600">ferienfrei</span>`);
+  const fei=feiOn(i);
+  if(fei.length)h+=`<p style="margin:8px 0 0">${fei.map(f=>`<span style="color:var(--fei);font-weight:600">${f.name}</span> · ${f.states?f.states.join(", "):"bundesweit"}`).join("<br>")}</p>`;
   if(off.length)h+=`<p class="foot" style="margin:6px 0 0">Abgewählt, aber an diesem Tag Ferien: ${off.map(e=>e.st+" ("+e.name+")").join(", ")}</p>`;
   detailEl.innerHTML=h;
 }
@@ -546,10 +625,12 @@ function renderDetail(){
 const minLenEl=document.getElementById("minLen"),hidePastEl=document.getElementById("hidePast");
 minLenEl.value=state.minLen;hidePastEl.checked=state.hidePast;
 minLenEl.addEventListener("input",()=>{const v=parseInt(minLenEl.value,10);if(v>0){state.minLen=v;save();renderPeriods(computePeriods())}});
+const countFeiEl=document.getElementById("countFei");countFeiEl.checked=state.countFei;
+countFeiEl.addEventListener("change",()=>{state.countFei=countFeiEl.checked;save();state.period=null;render()});
 hidePastEl.addEventListener("change",()=>{state.hidePast=hidePastEl.checked;save();renderPeriods(computePeriods())});
 
-function render(){if(!byDay.length)return;renderTabs();renderPeriods(computePeriods());renderCalendar();renderDetail()}
-function update(){syncMatrix();if(state.period){const ps=computePeriods();if(!ps.some(p=>p.a===state.period.a&&p.b===state.period.b))state.period=null}save();render()}
+function render(){if(!byDay.length)return;REL=relStates();renderTabs();renderPeriods(computePeriods());renderCalendar();renderDetail()}
+function update(){syncMatrix();REL=relStates();if(state.period){const ps=computePeriods();if(!ps.some(p=>p.a===state.period.a&&p.b===state.period.b))state.period=null}save();render()}
 const statusDot=document.querySelector("#status .dot"),statusText=document.getElementById("statusText"),reloadBtn=document.getElementById("reload");
 async function boot(){
   statusDot.className="dot";statusText.textContent="Lade Ferientermine …";reloadBtn.hidden=true;
@@ -558,10 +639,10 @@ async function boot(){
     statusDot.className="dot live";
     statusText.textContent=`Live-Daten · ${YEARS[0]}–${YEARS[YEARS.length-1]} · abgerufen ${now.toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}`;
   }catch(err){
-    initData(parseFallback());
+    initData({entries:parseFallback(),fei:parseFeiFallback()});
     statusDot.className="dot offline";
-    statusText.textContent=`API nicht erreichbar (${err.message}). Zeige gespeicherte Daten, Stand 05.10.2026.`;
-    reloadBtn.hidden=false;
+    statusText.textContent=OFFLINE?"Gespeicherte Daten, Stand 06.10.2026":`API nicht erreichbar (${err.message}). Zeige gespeicherte Daten, Stand 06.10.2026.`;
+    reloadBtn.hidden=OFFLINE;
   }
   state.period=null;state.picked=null;render();
 }
